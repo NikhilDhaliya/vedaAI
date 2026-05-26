@@ -5,6 +5,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
+import { connectDatabase } from "./config/database";
 import { setIoInstance } from "./socket/socket";
 import assignmentRoutes from "./assignment/assignment.route";
 
@@ -15,13 +16,8 @@ const app = express();
 const server = http.createServer(app);
 
 const allowedOrigins = [process.env.CLIENT_URL || "http://localhost:3000"];
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
 
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 const io = new Server(server, {
@@ -47,15 +43,21 @@ io.on("connection", (socket) => {
   });
 });
 
-app.get("/api/health", (req, res) => {
+app.get("/api/health", (_req, res) => {
   res.status(200).json({ status: "healthy", timestamp: new Date() });
 });
 
 app.use("/api", assignmentRoutes);
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`[Server] Running on port ${PORT}`);
+
+connectDatabase().then(() => {
+  server.listen(PORT, () => {
+    console.log(`[Server] Running on port ${PORT}`);
+  });
+}).catch((err) => {
+  console.error("[Server] Failed to start:", err.message);
+  process.exit(1);
 });
 
 export { app, io };
