@@ -36,7 +36,7 @@ setIoInstance(io);
 
 io.on("connection", (socket) => {
   console.log(`[Socket] Connected: ${socket.id}`);
-  
+
   socket.on("join-assignment", (assignmentId: string) => {
     socket.join(assignmentId);
     console.log(`[Socket] ${socket.id} joined room: ${assignmentId}`);
