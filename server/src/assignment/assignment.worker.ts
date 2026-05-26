@@ -99,4 +99,9 @@ export const assessmentWorker = new Worker(
 );
 
 console.log("[BullMQ] AssessmentWorker initialized");
+
+assessmentWorker.on("error", (err) => {
+  console.error("[BullMQ Worker Error]:", err.message);
+});
+
 export default assessmentWorker;

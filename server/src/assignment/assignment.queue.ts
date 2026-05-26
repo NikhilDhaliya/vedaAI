@@ -10,6 +10,10 @@ export const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
+connection.on("error", (err) => {
+  console.error("[Redis Connection Error]:", err.message);
+});
+
 export const assessmentQueue = new Queue("AssessmentQueue", {
   connection,
   defaultJobOptions: {
