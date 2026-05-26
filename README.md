@@ -6,6 +6,16 @@ A full-stack assessment creator portal that lets teachers generate structured ex
 
 ---
 
+## Live Demo (Assessment Review)
+
+For convenience during assessment, the application has been deployed live:
+
+* **Frontend App (Vercel):** [https://veda-ai-henna.vercel.app](https://veda-ai-henna.vercel.app)
+* **Backend Server (Google Cloud Run):** [https://vedaai-1090357889526.asia-south1.run.app](https://vedaai-1090357889526.asia-south1.run.app)
+* **AI API Status:** The primary **Google Gemini AI API** is actively configured and working with a safety spend cap for testing purposes. Feel free to run high-quality test generations!
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
