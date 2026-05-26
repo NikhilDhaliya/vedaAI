@@ -43,7 +43,7 @@ io.on("connection", (socket) => {
   });
 });
 
-app.get("/api/health", (_req, res) => {
+app.get("/", (_req, res) => {
   res.status(200).json({ status: "healthy", timestamp: new Date() });
 });
 

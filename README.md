@@ -24,7 +24,7 @@ For convenience during assessment, the application has been deployed live:
 | **State** | Zustand |
 | **Forms** | React Hook Form + Zod validation |
 | **Backend** | Express.js (TypeScript) |
-| **Database** | SQLite via Prisma ORM — chosen for zero-config local setup (no external DB server needed) |
+| **Database** | MongoDB via Mongoose — native document-based store for flexible exam models |
 | **Job Queue** | BullMQ + Redis (background AI generation) |
 | **AI (Primary)** | Google Gemini (`gemini-2.5-flash`) |
 | **AI (Fallback 1)** | OpenAI (`gpt-4o-mini`) |
@@ -48,7 +48,7 @@ For convenience during assessment, the application has been deployed live:
 │  (TypeScript)       │
 ├─────────────────────┤
 │  Multer (file upload)│
-│  Prisma (SQLite ORM) │
+│  Mongoose (MongoDB)  │
 │  Socket.io (events)  │
 └──────────┬──────────┘
            │ Job dispatch
@@ -62,7 +62,7 @@ For convenience during assessment, the application has been deployed live:
 │ 3. Call Gemini API   │
 │    ↳ fallback: OpenAI│
 │ 4. Validate with Zod │
-│ 5. Save to SQLite    │
+│ 5. Save to MongoDB   │
 │ 6. Emit completion   │
 └─────────────────────┘
 ```
@@ -74,21 +74,20 @@ For convenience during assessment, the application has been deployed live:
 3. Worker picks up the job, transitions status to `generating`, and emits a Socket.io event
 4. Worker builds a structured prompt and sends it to **Gemini 2.5 Flash** (primary)
 5. If Gemini fails (rate limit, network, etc.), it falls back to **OpenAI gpt-4o-mini**
-6. AI response is validated against strict Zod schemas and saved to SQLite in an atomic transaction
+6. AI response is validated against strict Zod schemas and saved to MongoDB in an atomic write (using nested schemas)
 7. Status transitions to `completed` and the client is notified via Socket.io
 8. Teacher views the generated paper with sections, questions, difficulty badges, and answer keys
 9. Paper can be exported as a pixel-perfect A4 PDF via Puppeteer
 
 ---
 
-## Why SQLite?
+## Why MongoDB?
 
-SQLite was chosen intentionally for assessment/hiring ease:
+MongoDB is used as the core data layer for the portal:
 
-- **Zero infrastructure** — no need to install or configure PostgreSQL/MySQL
-- **Single file database** — the entire DB is one `dev.db` file, trivial to reset or inspect
-- **Prisma compatible** — same ORM, same migration workflow; swapping to PostgreSQL for production is a one-line config change in `schema.prisma`
-- **Fast for single-user/demo** — perfect for local development and assessment review
+- **Perfect for Hierarchical Data** — Exam papers have a naturally nested tree-like structure (`Result` ➔ `Sections` ➔ `Questions`). MongoDB lets us model this using single nested documents rather than stitching multiple tables with relational foreign keys.
+- **Atomic Operations** — Generating a full question paper is written in a single database write instead of managing transaction rollbacks across multiple relational inserts.
+- **Production-Ready Scaling** — Swapping to an Atlas Cluster allows zero-config deployment to the cloud, perfectly matching serverless environments like Google Cloud Run.
 
 ---
 
@@ -207,21 +206,20 @@ Error returned to client
 If deploying this beyond a local demo:
 
 ### Database
-- **Swap SQLite → PostgreSQL**: Change `provider = "sqlite"` to `provider = "postgresql"` in `prisma/schema.prisma` and update `DATABASE_URL`. Run `npx prisma migrate dev`.
-- SQLite has no concurrent write support — PostgreSQL is required for multi-user production.
+- **Swapped SQLite ➔ MongoDB**: Successfully migrated to MongoDB (using Mongoose) to leverage native document nesting for exam papers. This ensures a scalable, high-performance database layer perfect for production clouds like MongoDB Atlas.
 
 ### Redis
 - Use a managed Redis provider (Upstash, Redis Cloud, AWS ElastiCache) instead of local Redis.
-- The current config already supports `rediss://` (TLS) connection strings.
+- The current config already supports `rediss://` (TLS) connection strings and is currently pointing to a cloud-hosted Upstash instance.
 
 ### AI Keys
 - Set up proper API key rotation and rate limit handling.
-- Consider adding **Anthropic Claude** (`claude-sonnet-4-20250514`) as a third fallback provider.
+- Consider adding **Anthropic Claude** (`claude-3-5-sonnet`) as a third fallback provider.
 - Add retry logic with exponential backoff for transient API failures.
 
-### File Storage
-- Move uploaded files from local disk (`uploads/`) to cloud storage (S3, GCS, Cloudflare R2).
-- Add file size limits and virus scanning.
+### File Storage (Local vs Cloudflare R2 / S3)
+- **Current Setup**: For the simplicity of this temporary assessment, uploads are stored locally in the `uploads/` directory on the server disk.
+- **Production Recommendation**: For a production environment (especially serverless hosting like Google Cloud Run where the filesystem is ephemeral), files should be streamed directly to **Cloudflare R2** or **AWS S3** rather than written to the local disk.
 
 ### Deployment
 - **Frontend**: Deploy to Vercel (`next build && next start`)
@@ -262,14 +260,16 @@ vedaAI-assesment/
 │   │   │   ├── assignment.worker.ts      # BullMQ job processor
 │   │   │   ├── assignment.queue.ts       # Queue config
 │   │   │   └── assignment.route.ts       # Express routes
+│   │   ├── models/            # Mongoose schemas
+│   │   │   ├── Assignment.ts  # Assignment schema definition
+│   │   │   └── Result.ts      # Exam paper result nested document schema
 │   │   ├── socket/socket.ts   # Socket.io setup
-│   │   ├── config/prisma.ts   # Prisma client
+│   │   ├── config/database.ts # MongoDB connection
 │   │   └── utils/fileParser.ts # PDF text extraction
-│   └── prisma/
-│       └── schema.prisma      # Database schema
+│   └── Dockerfile             # Production build container config
 │
 ├── .gitignore
-├── .env.example               # (not committed — see server/.env.example)
+├── .env.example               # Env template
 └── README.md
 ```
 
